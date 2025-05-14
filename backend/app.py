@@ -60,7 +60,7 @@ with app.app_context():
 def index():
     return 'API do Sistema Comercial funcionando!'
 
-# ---------- CLIENTES ---------- (Já funciona corretamente)
+# ---------- CLIENTES ---------- 
 @app.route('/clientes', methods=['GET'])
 def listar_clientes():
     clientes = Cliente.query.all()
@@ -99,7 +99,7 @@ def excluir_cliente(id):
     db.session.commit()
     return jsonify({'mensagem': 'Cliente excluído com sucesso'})
 
-# ---------- PRODUTOS ---------- (Já funciona corretamente)
+# ---------- PRODUTOS ---------- 
 @app.route('/produtos', methods=['GET'])
 def listar_produtos():
     produtos = Produto.query.all()
@@ -221,68 +221,86 @@ def listar_compras():
         })
     return jsonify(resultado)
 
-# ---------- RELATÓRIOS ---------- (Correção nas rotas de relatórios)
-@app.route('/vendas/produto', methods=['GET'])
-def vendas_por_produto():
-    vendas = db.session.query(
+@app.route('/relatorio/geral', methods=['GET'])
+def relatorio_geral():
+    # Total de vendas por produto
+    vendas_produto = db.session.query(
         Produto.nome,
         func.sum(ItemCompra.quantidade).label('quantidade_vendida')
     ).join(ItemCompra).group_by(Produto.id).all()
 
-    return jsonify([{'produto': v[0], 'quantidade_vendida': v[1]} for v in vendas])
-
-@app.route('/vendas/cliente', methods=['GET'])
-def vendas_por_cliente():
-    vendas = db.session.query(
+    # Total gasto por cliente
+    vendas_cliente = db.session.query(
         Cliente.nome,
         func.sum(Compra.total).label('total_compras')
     ).join(Compra).group_by(Cliente.id).all()
 
-    return jsonify([{'cliente': v[0], 'total_compras': v[1]} for v in vendas])
+    # Total geral vendido
+    total_geral = db.session.query(func.sum(Compra.total)).scalar() or 0.0
 
-# ---------- EXPORTAÇÃO ---------- (Correção nas rotas de exportação)
-@app.route('/exportar/compras/excel', methods=['GET'])
-def exportar_excel():
-    compras = Compra.query.all()
-    dados = []
+    # Lista detalhada de compras
+    compras = Compra.query.order_by(Compra.data.desc()).all()
+    lista_compras = []
     for compra in compras:
-        for item in compra.itens:
-            dados.append({
-                'Cliente': compra.cliente.nome,
-                'Produto': item.produto.nome,
-                'Quantidade': item.quantidade,
-                'Total': item.total,
-                'Data': compra.data.strftime('%d/%m/%Y')
-            })
+        lista_compras.append({
+            'id': compra.id,
+            'cliente': compra.cliente.nome,
+            'data': compra.data.strftime('%d/%m/%Y'),
+            'total': compra.total,
+            'itens': [
+                {
+                    'produto': item.produto.nome,
+                    'quantidade': item.quantidade,
+                    'total': item.total
+                } for item in compra.itens
+            ]
+        })
 
-    df = pd.DataFrame(dados)
-    excel_io = BytesIO()
-    with pd.ExcelWriter(excel_io, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False)
-    excel_io.seek(0)
+    return jsonify({
+        'resumo_vendas_produto': [{'produto': v[0], 'quantidade_vendida': v[1]} for v in vendas_produto],
+        'resumo_vendas_cliente': [{'cliente': v[0], 'total_compras': v[1]} for v in vendas_cliente],
+        'total_geral_vendido': total_geral,
+        'compras_detalhadas': lista_compras
+    })
 
-    return send_file(excel_io, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                     as_attachment=True, download_name='compras.xlsx')
+@app.route('/vendas/cliente')
+def vendas_por_cliente():
+    resultados = db.session.query(
+        Cliente.nome,
+        func.count(Compra.id).label('total_compras')
+    ).join(Compra, Compra.cliente_id == Cliente.id) \
+     .group_by(Cliente.id).all()
 
-@app.route('/exportar/compras/pdf', methods=['GET'])
-def exportar_pdf():
-    compras = Compra.query.all()
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font('Arial', 'B', 12)
-    pdf.cell(200, 10, 'Relatório de Compras', ln=True, align='C')
-    pdf.ln(10)
+    data = [{'nome': nome, 'total_compras': total} for nome, total in resultados]
+    return jsonify(data)
 
-    for compra in compras:
-        for item in compra.itens:
-            linha = f"Cliente: {compra.cliente.nome} | Produto: {item.produto.nome} | Qtd: {item.quantidade} | Total: {item.total:.2f} | Data: {compra.data.strftime('%d/%m/%Y')}"
-            pdf.set_font('Arial', '', 10)
-            pdf.multi_cell(0, 8, linha)
 
-    pdf_io = BytesIO()
-    pdf.output(pdf_io)
-    pdf_io.seek(0)
-    return send_file(pdf_io, mimetype='application/pdf', as_attachment=True, download_name='compras.pdf')
+@app.route('/vendas/produto')
+def vendas_por_produto():
+    resultados = db.session.query(
+        Produto.nome,
+        func.sum(ItemCompra.quantidade).label('total_vendido')
+    ).join(ItemCompra, ItemCompra.produto_id == Produto.id) \
+     .group_by(Produto.id).all()
+
+    data = [{'nome': nome, 'total_vendido': total} for nome, total in resultados]
+    return jsonify(data)
+
+
+@app.route('/clientes/count')
+def contar_clientes():
+    total = Cliente.query.count()
+    return jsonify({'total': total})
+
+@app.route('/produtos/count')
+def contar_produtos():
+    total = Produto.query.count()
+    return jsonify({'total': total})
+
+@app.route('/compras/count')
+def contar_compras():
+    total = Compra.query.count()
+    return jsonify({'total': total})
 
 # ---------- EXECUÇÃO ----------
 if __name__ == '__main__':

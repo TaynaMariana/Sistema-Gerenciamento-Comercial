@@ -114,7 +114,7 @@ export const criarCompra = async (compra) => {
 // Vendas por produto (total de compras por produto)
 export const vendasPorProduto = async () => {
   try {
-    const response = await API_URL.get('/relatorios/vendas_por_produto');
+    const response = await API_URL.get('/vendas/produto');
     return response.data;
   } catch (error) {
     console.error('Erro ao listar vendas por produto', error);
@@ -125,7 +125,7 @@ export const vendasPorProduto = async () => {
 // Vendas por cliente (total de compras por cliente)
 export const vendasPorCliente = async () => {
   try {
-    const response = await API_URL.get('/relatorios/vendas_por_cliente');
+    const response = await API_URL.get('/vendas/cliente');
     return response.data;
   } catch (error) {
     console.error('Erro ao listar vendas por cliente', error);
@@ -153,6 +153,17 @@ export const contarCompras = async () => {
 export const faturamentoTotal = async () => {
   const response = await API_URL.get(`/compras/faturamento`);
   return response.data;
+};
+
+// Relatório consolidado geral
+export const relatorioGeral = async () => {
+  try {
+    const response = await API_URL.get('/relatorio/geral');
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao carregar relatório geral', error);
+    throw error;
+  }
 };
 
 export default API_URL;

@@ -1,228 +1,100 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Box, TextField, Button, Typography, Alert, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper, MenuItem, Select, FormControl, InputLabel } from '@mui/material';
-import * as XLSX from 'xlsx';
-import { jsPDF } from 'jspdf';
+import React, { useEffect, useState } from 'react';
+import { vendasPorCliente, vendasPorProduto, contarClientes, contarProdutos, contarCompras } from '../services/api';
 
 const Relatorio = () => {
-  const [compras, setCompras] = useState([]);
   const [clientes, setClientes] = useState([]);
   const [produtos, setProdutos] = useState([]);
-  const [filtro, setFiltro] = useState({
-    dataInicial: '',
-    dataFinal: '',
-    cliente: '',
-    produto: '',
-    tipoRelatorio: ''
+  const [dados, setDados] = useState({
+    total_clientes: 0,
+    total_produtos: 0,
+    total_compras: 0,
   });
-  const [mensagemErro, setMensagemErro] = useState('');
-  const [mensagemSucesso, setMensagemSucesso] = useState('');
 
   useEffect(() => {
-    // Carregar todos os clientes e produtos ao iniciar o componente
-    axios.get('http://127.0.0.1:5000/clientes')
-      .then((res) => setClientes(res.data))
-      .catch((error) => {
-        console.error('Erro ao carregar clientes:', error);
-        setMensagemErro('Erro ao carregar dados de clientes.');
-      });
+    const carregarDados = async () => {
+      try {
+        const [clientesData, produtosData, totalClientes, totalProdutos, totalCompras] = await Promise.all([
+          vendasPorCliente(),
+          vendasPorProduto(),
+          contarClientes(),
+          contarProdutos(),
+          contarCompras(),
+        ]);
 
-    axios.get('http://127.0.0.1:5000/produtos')
-      .then((res) => setProdutos(res.data))
-      .catch((error) => {
-        console.error('Erro ao carregar produtos:', error);
-        setMensagemErro('Erro ao carregar dados de produtos.');
-      });
+        setClientes(clientesData);
+        setProdutos(produtosData);
+        setDados({
+          total_clientes: totalClientes.total,
+          total_produtos: totalProdutos.total,
+          total_compras: totalCompras.total,
+        });
+      } catch (error) {
+        console.error('Erro ao carregar dados dos relatórios:', error);
+      }
+    };
+
+    carregarDados();
   }, []);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFiltro({
-      ...filtro,
-      [name]: value
-    });
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setMensagemErro('');
-    setMensagemSucesso('');
-
-    // Verificar se pelo menos um filtro foi preenchido
-    if (!filtro.dataInicial && !filtro.dataFinal && !filtro.cliente && !filtro.produto && !filtro.tipoRelatorio) {
-      setMensagemErro('Por favor, preencha ao menos um filtro.');
-      return;
-    }
-
-    // Filtrando compras conforme os dados do filtro
-    axios.post('http://127.0.0.1:5000/compras/filtrar', filtro)
-      .then((res) => {
-        setCompras(res.data);
-        setMensagemSucesso('Relatório filtrado com sucesso!');
-      })
-      .catch((error) => {
-        console.error('Erro ao aplicar filtros de compras:', error);
-        setMensagemErro('Erro ao aplicar os filtros.');
-      });
-  };
-
-  const exportToExcel = () => {
-    const ws = XLSX.utils.json_to_sheet(compras);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Relatório');
-    XLSX.writeFile(wb, 'relatorio_compras.xlsx');
-  };
-
-  const exportToPDF = () => {
-    const doc = new jsPDF();
-    doc.autoTable({
-      head: [['ID Compra', 'Cliente', 'Produto', 'Quantidade', 'Valor Total']],
-      body: compras.map(compra => [
-        compra.id,
-        compra.cliente,
-        compra.produto,
-        compra.quantidade,
-        `R$ ${parseFloat(compra.valorTotal).toFixed(2)}`
-      ]),
-    });
-    doc.save('relatorio_compras.pdf');
-  };
-
   return (
-    <Box sx={{ backgroundColor: '#121B2D', padding: 4, borderRadius: 2 }}>
-      <Typography variant="h4" color="white" align="center" gutterBottom>
-        Relatório
-      </Typography>
+    <div style={{ backgroundColor: '#0e1a2b', color: 'white', padding: '2rem', borderRadius: '10px', maxWidth: '900px', margin: '0 auto' }}>
+      <h2 style={{ textAlign: 'center', marginBottom: '2rem' }}>Relatórios Gerais</h2>
 
-      {/* Mensagens de sucesso ou erro */}
-      {mensagemErro && <Alert severity="error">{mensagemErro}</Alert>}
-      {mensagemSucesso && <Alert severity="success">{mensagemSucesso}</Alert>}
+      <div style={{ display: 'flex', justifyContent: 'space-around', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+        <div style={{ backgroundColor: '#1e2a3c', padding: '1rem', borderRadius: '10px', minWidth: '150px', textAlign: 'center' }}>
+          <h3>Clientes</h3>
+          <p>{dados.total_clientes}</p>
+        </div>
+        <div style={{ backgroundColor: '#1e2a3c', padding: '1rem', borderRadius: '10px', minWidth: '150px', textAlign: 'center' }}>
+          <h3>Produtos</h3>
+          <p>{dados.total_produtos}</p>
+        </div>
+        <div style={{ backgroundColor: '#1e2a3c', padding: '1rem', borderRadius: '10px', minWidth: '150px', textAlign: 'center' }}>
+          <h3>Compras</h3>
+          <p>{dados.total_compras}</p>
+        </div>
+      </div>
 
-      <Paper sx={{ padding: 3, backgroundColor: '#1E2A47', mb: 4 }}>
-        <form onSubmit={handleSubmit}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <TextField
-              label="Data Inicial"
-              type="date"
-              name="dataInicial"
-              value={filtro.dataInicial}
-              onChange={handleChange}
-              sx={{ backgroundColor: '#fff' }}
-              InputLabelProps={{ shrink: true }}
-            />
-            <TextField
-              label="Data Final"
-              type="date"
-              name="dataFinal"
-              value={filtro.dataFinal}
-              onChange={handleChange}
-              sx={{ backgroundColor: '#fff' }}
-              InputLabelProps={{ shrink: true }}
-            />
+      <div style={{ marginBottom: '2rem' }}>
+        <h3 style={{ marginBottom: '1rem' }}>Vendas por Cliente</h3>
+        <table style={{ width: '100%', backgroundColor: '#1e2a3c', color: 'white', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ borderBottom: '1px solid white', padding: '0.5rem' }}>Cliente</th>
+              <th style={{ borderBottom: '1px solid white', padding: '0.5rem' }}>Total Compras</th>
+            </tr>
+          </thead>
+          <tbody>
+            {clientes.map((cliente, index) => (
+              <tr key={index}>
+                <td style={{ padding: '0.5rem', textAlign: 'center' }}>{cliente.nome}</td>
+                <td style={{ padding: '0.5rem', textAlign: 'center' }}>{cliente.total_compras}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-            {/* Cliente Select */}
-            <FormControl sx={{ backgroundColor: '#fff' }}>
-              <InputLabel id="cliente-label">Cliente</InputLabel>
-              <Select
-                labelId="cliente-label"
-                name="cliente"
-                value={filtro.cliente}
-                onChange={handleChange}
-                displayEmpty
-              >
-                <MenuItem value="">Selecione um Cliente</MenuItem>
-                {clientes.map((cliente) => (
-                  <MenuItem key={cliente.id} value={cliente.id}>{cliente.nome}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Produto Select */}
-            <FormControl sx={{ backgroundColor: '#fff' }}>
-              <InputLabel id="produto-label">Produto</InputLabel>
-              <Select
-                labelId="produto-label"
-                name="produto"
-                value={filtro.produto}
-                onChange={handleChange}
-                displayEmpty
-              >
-                <MenuItem value="">Selecione um Produto</MenuItem>
-                {produtos.map((produto) => (
-                  <MenuItem key={produto.id} value={produto.id}>{produto.nome}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            {/* Tipo de Relatório Select */}
-            <FormControl sx={{ backgroundColor: '#fff' }}>
-              <InputLabel id="tipoRelatorio-label">Tipo de Relatório</InputLabel>
-              <Select
-                labelId="tipoRelatorio-label"
-                name="tipoRelatorio"
-                value={filtro.tipoRelatorio}
-                onChange={handleChange}
-                displayEmpty
-              >
-                <MenuItem value="">Selecione um Tipo de Relatório</MenuItem>
-                <MenuItem value="vendas">Relatório de Vendas</MenuItem>
-                <MenuItem value="compras">Relatório de Compras</MenuItem>
-              </Select>
-            </FormControl>
-
-            <Button type="submit" variant="contained" sx={{ backgroundColor: '#00A9E0', color: '#fff' }}>
-              Filtrar Relatório
-            </Button>
-          </Box>
-        </form>
-      </Paper>
-
-      {/* Exibir a tabela de compras apenas se o filtro for aplicado */}
-      {compras.length > 0 && (
-        <>
-          <Typography variant="h5" color="white" align="center" gutterBottom>
-            Lista de Compras
-          </Typography>
-
-          <TableContainer component={Paper} sx={{ backgroundColor: '#1E2A47' }}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ color: '#00A9E0' }}>ID Compra</TableCell>
-                  <TableCell sx={{ color: '#00A9E0' }}>Cliente</TableCell>
-                  <TableCell sx={{ color: '#00A9E0' }}>Produto</TableCell>
-                  <TableCell sx={{ color: '#00A9E0' }}>Quantidade</TableCell>
-                  <TableCell sx={{ color: '#00A9E0' }}>Valor Total</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {compras.map((compra) => (
-                  <TableRow key={compra.id}>
-                    <TableCell sx={{ color: '#A1B2C1' }}>{compra.id}</TableCell>
-                    <TableCell sx={{ color: '#A1B2C1' }}>{compra.cliente}</TableCell>
-                    <TableCell sx={{ color: '#A1B2C1' }}>{compra.produto}</TableCell>
-                    <TableCell sx={{ color: '#A1B2C1' }}>{compra.quantidade}</TableCell>
-                    <TableCell sx={{ color: '#A1B2C1' }}>
-                      R$ {compra.valorTotal ? parseFloat(compra.valorTotal).toFixed(2) : '0.00'}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-
-          {/* Botões de exportação */}
-          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 4 }}>
-            <Button variant="contained" sx={{ backgroundColor: '#4CAF50', color: '#fff' }} onClick={exportToExcel}>
-              Exportar para Excel
-            </Button>
-            <Button variant="contained" sx={{ backgroundColor: '#D32F2F', color: '#fff' }} onClick={exportToPDF}>
-              Exportar para PDF
-            </Button>
-          </Box>
-        </>
-      )}
-    </Box>
+      <div>
+        <h3 style={{ marginBottom: '1rem' }}>Vendas por Produto</h3>
+        <table style={{ width: '100%', backgroundColor: '#1e2a3c', color: 'white', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ borderBottom: '1px solid white', padding: '0.5rem' }}>Produto</th>
+              <th style={{ borderBottom: '1px solid white', padding: '0.5rem' }}>Quantidade Vendida</th>
+            </tr>
+          </thead>
+          <tbody>
+            {produtos.map((produto, index) => (
+              <tr key={index}>
+                <td style={{ padding: '0.5rem', textAlign: 'center' }}>{produto.nome}</td>
+                <td style={{ padding: '0.5rem', textAlign: 'center' }}>{produto.total_vendido}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 };
 
