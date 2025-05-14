@@ -98,24 +98,17 @@ export const listarCompras = async () => {
   }
 };
 
-// Atualiza o processo de compra, registrando todos os produtos de uma vez e baixando o estoque
+// Atualiza o processo de compra, registrando todos os produtos de uma vez
 export const criarCompra = async (compra) => {
   try {
     const response = await API_URL.post('/compras', compra);
-
-    // Baixar o estoque após a compra
-    for (let item of compra.produtos) {
-      const produtoId = item.produto_id;
-      const quantidadeComprada = item.quantidade;
-      await API_URL.put(`/produtos/${produtoId}/estoque`, { quantidade: quantidadeComprada });
-    }
-
     return response.data;
   } catch (error) {
     console.error('Erro ao criar compra', error);
     throw error;
   }
 };
+
 
 // === RELATÓRIOS ===
 // Vendas por produto (total de compras por produto)

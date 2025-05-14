@@ -25,14 +25,12 @@ const Compras = () => {
   const [estoqueDisponivel, setEstoqueDisponivel] = useState(null);
   const [mensagemErro, setMensagemErro] = useState('');
   const [mensagemSucesso, setMensagemSucesso] = useState('');
-  const [compras, setCompras] = useState([]);
   const [produtosNaCompra, setProdutosNaCompra] = useState([]);
   const [valorTotal, setValorTotal] = useState(0);
 
   useEffect(() => {
     buscarProdutos();
     buscarClientes();
-    buscarCompras();
   }, []);
 
   useEffect(() => {
@@ -57,13 +55,6 @@ const Compras = () => {
       .catch((err) => console.error('Erro ao buscar clientes:', err));
   };
 
-  const buscarCompras = () => {
-    axios
-      .get('http://127.0.0.1:5000/compras')
-      .then((res) => setCompras(res.data))
-      .catch((err) => console.error('Erro ao buscar compras:', err));
-  };
-
   const handleProdutoChange = (e) => {
     const id = e.target.value;
     setProdutoSelecionado(id);
@@ -73,8 +64,12 @@ const Compras = () => {
 
     axios
       .get(`http://127.0.0.1:5000/produtos/${id}`)
-      .then((res) => setEstoqueDisponivel(res.data.estoque))
-      .catch((err) => console.error('Erro ao buscar produto:', err));
+      .then((response) => {
+        setEstoqueDisponivel(response.data.estoque);
+      })
+      .catch((error) => {
+        console.error('Erro ao buscar produto:', error.response ? error.response.data : error.message);
+      });
   };
 
   const handleAddProduto = () => {
@@ -84,16 +79,21 @@ const Compras = () => {
     }
 
     const produtoSelecionadoData = produtos.find(
-      (prod) => prod.id === produtoSelecionado
+      (prod) => prod.id === parseInt(produtoSelecionado)
     );
 
-    if (quantidade > estoqueDisponivel) {
+    if (produtosNaCompra.some((p) => p.id === produtoSelecionadoData.id)) {
+      setMensagemErro('Produto já foi adicionado!');
+      return;
+    }
+
+    if (parseInt(quantidade) > estoqueDisponivel) {
       setMensagemErro('Estoque insuficiente para a quantidade informada.');
       return;
     }
 
     const novoProdutoNaCompra = {
-      id: produtoSelecionado,
+      id: produtoSelecionadoData.id,
       nome: produtoSelecionadoData.nome,
       preco: produtoSelecionadoData.preco,
       quantidade: parseInt(quantidade),
@@ -103,10 +103,11 @@ const Compras = () => {
     setProdutoSelecionado('');
     setQuantidade('');
     setEstoqueDisponivel(null);
+    setMensagemErro('');
   };
 
   const handleRemoverProduto = (id) => {
-    setProdutosNaCompra(produtosNaCompra.filter(produto => produto.id !== id));
+    setProdutosNaCompra(produtosNaCompra.filter((produto) => produto.id !== id));
   };
 
   const handleSubmit = (e) => {
@@ -117,9 +118,14 @@ const Compras = () => {
       return;
     }
 
+    if (produtosNaCompra.length === 0) {
+      setMensagemErro('Adicione pelo menos um produto!');
+      return;
+    }
+
     const novaCompra = {
-      cliente_id: clienteSelecionado,
-      produtos: produtosNaCompra.map((produto) => ({
+      cliente_id: parseInt(clienteSelecionado),
+      itens: produtosNaCompra.map((produto) => ({
         produto_id: produto.id,
         quantidade: produto.quantidade,
       })),
@@ -133,22 +139,11 @@ const Compras = () => {
         setProdutosNaCompra([]);
         setClienteSelecionado('');
         buscarProdutos();
-        buscarCompras();
       })
       .catch((err) => {
         console.error('Erro ao registrar compra:', err);
         setMensagemErro('Erro ao registrar compra.');
       });
-  };
-
-  const nomeProduto = (id) => {
-    const prod = produtos.find((p) => p.id === id);
-    return prod ? prod.nome : `ID ${id}`;
-  };
-
-  const nomeCliente = (id) => {
-    const cli = clientes.find((c) => c.id === id);
-    return cli ? cli.nome : `ID ${id}`;
   };
 
   return (
@@ -256,9 +251,7 @@ const Compras = () => {
                 <TableCell>{produto.nome}</TableCell>
                 <TableCell>{produto.quantidade}</TableCell>
                 <TableCell>R$ {produto.preco.toFixed(2)}</TableCell>
-                <TableCell>
-                  R$ {(produto.preco * produto.quantidade).toFixed(2)}
-                </TableCell>
+                <TableCell>R$ {(produto.preco * produto.quantidade).toFixed(2)}</TableCell>
                 <TableCell>
                   <Button
                     variant="outlined"
@@ -268,31 +261,6 @@ const Compras = () => {
                     Remover
                   </Button>
                 </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      <Typography variant="h5" color="white" gutterBottom>
-        Compras Realizadas
-      </Typography>
-
-      <TableContainer component={Paper}>
-        <Table sx={{ minWidth: 650, backgroundColor: '#f5f5f5' }}>
-          <TableHead>
-            <TableRow>
-              <TableCell>Cliente</TableCell>
-              <TableCell>Produto</TableCell>
-              <TableCell>Quantidade</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {compras.map((compra, index) => (
-              <TableRow key={index}>
-                <TableCell>{nomeCliente(compra.cliente_id)}</TableCell>
-                <TableCell>{nomeProduto(compra.produto_id)}</TableCell>
-                <TableCell>{compra.quantidade}</TableCell>
               </TableRow>
             ))}
           </TableBody>

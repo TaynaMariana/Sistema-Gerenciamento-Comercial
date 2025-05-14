@@ -26,7 +26,7 @@ const Relatorio = () => {
         console.error('Erro ao carregar clientes:', error);
         setMensagemErro('Erro ao carregar dados de clientes.');
       });
-    
+
     axios.get('http://127.0.0.1:5000/produtos')
       .then((res) => setProdutos(res.data))
       .catch((error) => {
@@ -91,7 +91,7 @@ const Relatorio = () => {
   return (
     <Box sx={{ backgroundColor: '#121B2D', padding: 4, borderRadius: 2 }}>
       <Typography variant="h4" color="white" align="center" gutterBottom>
-        Relatório de Compras
+        Relatório
       </Typography>
 
       {/* Mensagens de sucesso ou erro */}
@@ -203,7 +203,7 @@ const Relatorio = () => {
                     <TableCell sx={{ color: '#A1B2C1' }}>{compra.produto}</TableCell>
                     <TableCell sx={{ color: '#A1B2C1' }}>{compra.quantidade}</TableCell>
                     <TableCell sx={{ color: '#A1B2C1' }}>
-                      R$ {parseFloat(compra.valorTotal).toFixed(2)}
+                      R$ {compra.valorTotal ? parseFloat(compra.valorTotal).toFixed(2) : '0.00'}
                     </TableCell>
                   </TableRow>
                 ))}
